@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Jupyter / IDE
+.ipynb_checkpoints/
+.vscode/
+.idea/
+*.swp
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Mo hinh da train (chay lai: python train.py)
+artifacts/*
+!artifacts/.gitkeep
+
+# He thong
+.DS_Store
+Thumbs.db
+*.log
