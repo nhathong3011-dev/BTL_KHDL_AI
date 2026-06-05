@@ -1,4 +1,4 @@
-"""Web demo AML & Fraud Patterns."""
+"""Web demo AML & Fraud Patterns (co xac thuc API key)."""
 
 import io
 import sys
@@ -12,6 +12,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from dashboard.auth import is_authenticated, logout, render_login_gate
 from dashboard.theme import CSS, COLORS, PLOTLY
 from src.config import DATA_FILE, FEATURE_LABELS
 from src.dataset import load_dataset, summary_stats
@@ -19,6 +20,10 @@ from src.modeling import load_artifacts, load_metrics, predict_one, train_all, s
 
 st.set_page_config(page_title="FinGuard AML", page_icon="🛡️", layout="wide")
 st.markdown(CSS, unsafe_allow_html=True)
+
+if not is_authenticated():
+    render_login_gate()
+    st.stop()
 
 
 @st.cache_data(show_spinner=False)
@@ -29,9 +34,12 @@ def get_data():
 def ensure_models():
     bundle = load_artifacts()
     if bundle is None:
-        with st.spinner("Dang huan luyen mo hinh (lan dau, ~1-2 phut)..."):
+        with st.spinner("Dang huan luyen mo hinh (~1-2 phut)..."):
             save_artifacts(train_all())
         bundle = load_artifacts()
+        if bundle is None:
+            st.error("Khong tai duoc mo hinh sau khi huan luyen. Chay: python train.py")
+            st.stop()
     return bundle
 
 
@@ -48,6 +56,11 @@ def read_upload(f):
 with st.sidebar:
     st.markdown("## FinGuard AML")
     st.caption("Fraud Patterns & Credit Risk")
+    st.success("Da xac thuc key")
+    if st.button("Dang xuat", use_container_width=True):
+        logout()
+        st.rerun()
+    st.divider()
     page = st.radio("Menu", ["Tong quan", "Mo hinh AI", "Scoring ho so"])
     st.divider()
     st.caption("Nguon: UCI Credit Card Default")
@@ -63,11 +76,11 @@ stats = summary_stats(df, target_col)
 
 st.markdown(
     """
-    <div class="hero">
+    <motion class="hero">
         <h1>Phan tich AML & Fraud Patterns</h1>
-        <p>Scoring rui ro tin dung — 30.000 ho so, 4 mo hinh ML, dashboard danh cho bao cao BTL KHDL/AI.</p>
-    </div>
-    """,
+        <p>Scoring rui ro tin dung — 30.000 ho so, 4 mo hinh ML (truy cap bao ve key).</p>
+    </motion>
+    """.replace("motion", "div"),
     unsafe_allow_html=True,
 )
 
@@ -122,7 +135,7 @@ elif page == "Mo hinh AI":
         st.warning("Chua co mo hinh. Bam nut tren hoac chay: `python train.py`")
         st.stop()
 
-    bundle = ensure_models()
+    ensure_models()
     df_m = pd.DataFrame(metrics).set_index("name")
     st.dataframe(df_m[["accuracy", "precision", "recall", "f1", "roc_auc"]], use_container_width=True)
 
@@ -197,14 +210,14 @@ else:
             label, p_risk, p_safe = predict_one(bundle, model_name, inputs)
             if label == 0:
                 st.markdown(
-                    f'<div class="alert-ok"><h3>Ho so binh thuong</h3>'
-                    f'<p>Xac suat rui ro: {p_risk*100:.1f}%</p></div>',
+                    f'<motion class="alert-ok"><h3>Ho so binh thuong</h3>'
+                    f'<p>Xac suat rui ro: {p_risk*100:.1f}%</p></motion>'.replace("motion", "div"),
                     unsafe_allow_html=True,
                 )
             else:
                 st.markdown(
                     f'<div class="alert-risk"><h3>Canh bao rui ro cao</h3>'
-                    f'<p>Xac suat vo no / gian lan: {p_risk*100:.1f}% — de xuat ra soat AML.</p></div>',
+                    f'<p>Xac suat vo no: {p_risk*100:.1f}% — de xuat ra soat AML.</p></div>',
                     unsafe_allow_html=True,
                 )
 

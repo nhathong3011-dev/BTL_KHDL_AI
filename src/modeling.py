@@ -138,7 +138,11 @@ def save_artifacts(train_output: dict) -> None:
 def load_artifacts() -> dict | None:
     if not MODELS_FILE.exists():
         return None
-    return joblib.load(MODELS_FILE)
+    try:
+        return joblib.load(MODELS_FILE)
+    except Exception:
+        # Mo hinh cu luu bang sklearn khac phien ban — can train lai
+        return None
 
 
 def load_metrics() -> list[dict] | None:

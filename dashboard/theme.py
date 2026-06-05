@@ -69,5 +69,16 @@ html, body, [class*="css"] { font-family: 'IBM Plex Sans', sans-serif; }
     color: #fff !important;
     font-weight: 600 !important;
 }
+.login-panel {
+    background: linear-gradient(145deg, rgba(13,59,102,0.5), rgba(10,18,32,0.95));
+    border: 1px solid rgba(201,162,39,0.35);
+    border-radius: 16px;
+    padding: 2rem 1.75rem 1rem;
+    margin-bottom: 1.25rem;
+    text-align: center;
+}
+.login-panel h2 { color: #d4af37; margin: 0; font-size: 1.5rem; }
+.login-panel .login-sub { color: #94a3b8; margin: 0.35rem 0 0; font-size: 0.9rem; }
+.login-panel .login-hint { color: #6b7c93; font-size: 0.8rem; margin-top: 0.75rem; }
 </style>
 """
