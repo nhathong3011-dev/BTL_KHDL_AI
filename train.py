@@ -46,9 +46,16 @@ def main():
     stats = summary_stats(df, target_col)
     print(f"\nDu lieu: {stats['total']:,} ho so | Rui ro: {stats['risk']:,} ({stats['risk_rate']}%)")
 
-    print("\nDang huan luyen...")
+    print("\nDang huan luyen (StandardScaler + PCA + Classifier)...")
     out = train_all()
     save_artifacts(out)
+
+    pca = out["bundle"].get("pca_info")
+    if pca:
+        print(
+            f"\nPCA: {pca['n_features_original']} dac trung -> {pca['n_components']} thanh phan "
+            f"(giu {pca['total_variance_retained'] * 100:.1f}% phuong sai)"
+        )
 
     ARTIFACTS_DIR.mkdir(exist_ok=True)
     plot_distribution(out["df"], target_col, CHART_FILE)

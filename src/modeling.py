@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
@@ -21,7 +22,10 @@ from sklearn.metrics import (
     roc_curve,
 )
 
-from src.config import RANDOM_STATE, TEST_SIZE, MODEL_NAMES, MODELS_FILE, METRICS_FILE, ARTIFACTS_DIR
+from src.config import (
+    RANDOM_STATE, TEST_SIZE, PCA_VARIANCE,
+    MODEL_NAMES, MODELS_FILE, METRICS_FILE, ARTIFACTS_DIR,
+)
 from src.dataset import load_dataset
 
 try:
@@ -67,15 +71,44 @@ def _make_estimators() -> dict:
     return {k: est[k] for k in MODEL_NAMES if k in est}
 
 
+def _make_pipeline(clf) -> Pipeline:
+    """Chuan hoa -> PCA giam chieu -> phan loai."""
+    return Pipeline([
+        ("scaler", StandardScaler()),
+        ("pca", PCA(n_components=PCA_VARIANCE, random_state=RANDOM_STATE)),
+        ("clf", clf),
+    ])
+
+
+def _pca_component_names(pipeline) -> list[str]:
+    pca = pipeline.named_steps["pca"]
+    return [f"PC{i + 1}" for i in range(pca.n_components_)]
+
+
+def _extract_pca_info(pipeline) -> dict:
+    pca = pipeline.named_steps["pca"]
+    evr = pca.explained_variance_ratio_
+    cum = np.cumsum(evr)
+    return {
+        "n_components": int(pca.n_components_),
+        "n_features_original": int(pca.n_features_in_),
+        "variance_threshold": PCA_VARIANCE,
+        "explained_variance_ratio": [round(float(x), 4) for x in evr],
+        "cumulative_variance": [round(float(x), 4) for x in cum],
+        "total_variance_retained": round(float(cum[-1]), 4),
+    }
+
+
 def _importance(pipeline, feature_cols: list[str]) -> dict:
     model = pipeline.named_steps["clf"]
+    names = _pca_component_names(pipeline) if "pca" in pipeline.named_steps else feature_cols
     if hasattr(model, "feature_importances_"):
         vals = model.feature_importances_
     elif hasattr(model, "coef_"):
         vals = np.abs(model.coef_).ravel()
     else:
-        vals = np.zeros(len(feature_cols))
-    pairs = sorted(zip(feature_cols, vals), key=lambda x: x[1], reverse=True)
+        vals = np.zeros(len(names))
+    pairs = sorted(zip(names, vals), key=lambda x: x[1], reverse=True)
     return {k: float(v) for k, v in pairs[:15]}
 
 
@@ -91,13 +124,13 @@ def train_all(test_size: float = TEST_SIZE) -> dict:
 
     pipelines = {}
     metrics = []
+    pca_info = None
 
     for name, clf in _make_estimators().items():
-        pipe = Pipeline([
-            ("scaler", StandardScaler()),
-            ("clf", clf),
-        ])
+        pipe = _make_pipeline(clf)
         pipe.fit(X_train, y_train)
+        if pca_info is None:
+            pca_info = _extract_pca_info(pipe)
         y_pred = pipe.predict(X_test)
         y_prob = pipe.predict_proba(X_test)[:, 1]
         fpr, tpr, _ = roc_curve(y_test, y_prob)
@@ -122,6 +155,7 @@ def train_all(test_size: float = TEST_SIZE) -> dict:
         "target_col": target_col,
         "medians": X.median().to_dict(),
         "test_size": test_size,
+        "pca_info": pca_info,
     }
     return {"bundle": bundle, "metrics": metrics, "df": df}
 

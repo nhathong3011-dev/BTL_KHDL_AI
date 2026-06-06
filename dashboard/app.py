@@ -78,7 +78,7 @@ st.markdown(
     """
     <motion class="hero">
         <h1>Phan tich AML & Fraud Patterns</h1>
-        <p>Scoring rui ro tin dung — 30.000 ho so, 4 mo hinh ML (truy cap bao ve key).</p>
+        <p>Scoring rui ro tin dung — 30.000 ho so, PCA + 4 mo hinh ML (truy cap bao ve key).</p>
     </motion>
     """.replace("motion", "div"),
     unsafe_allow_html=True,
@@ -135,7 +135,60 @@ elif page == "Mo hinh AI":
         st.warning("Chua co mo hinh. Bam nut tren hoac chay: `python train.py`")
         st.stop()
 
-    ensure_models()
+    bundle = ensure_models()
+    pca_info = bundle.get("pca_info")
+    if pca_info:
+        st.subheader("Giam chieu PCA")
+        p1, p2, p3, p4 = st.columns(4)
+        p1.metric("Dac trung goc", pca_info["n_features_original"])
+        p2.metric("Thanh phan PCA", pca_info["n_components"])
+        p3.metric("Nguong phuong sai", f"{pca_info['variance_threshold'] * 100:.0f}%")
+        p4.metric("Phuong sai giu lai", f"{pca_info['total_variance_retained'] * 100:.1f}%")
+        st.caption(
+            "Pipeline: StandardScaler → PCA (giu ≥95% phuong sai) → Classifier. "
+            "Nguoi dung van nhap 22 dac trung goc; PCA chay tu dong khi du doan."
+        )
+        evr = pca_info["explained_variance_ratio"]
+        cum = pca_info["cumulative_variance"]
+        pca_df = pd.DataFrame({
+            "Thanh phan": [f"PC{i + 1}" for i in range(len(evr))],
+            "Phuong sai rieng": evr,
+            "Phuong sai tich luy": cum,
+        })
+        fig_pca = go.Figure()
+        fig_pca.add_trace(go.Bar(
+            x=pca_df["Thanh phan"], y=pca_df["Phuong sai rieng"],
+            name="Phuong sai rieng", marker_color=COLORS[0],
+        ))
+        fig_pca.add_trace(go.Scatter(
+            x=pca_df["Thanh phan"], y=pca_df["Phuong sai tich luy"],
+            name="Tich luy", mode="lines+markers", yaxis="y2", line=dict(color=COLORS[3]),
+        ))
+        fig_pca.update_layout(
+            title="Bieu do phuong sai PCA (Scree)",
+            yaxis_title="Phuong sai rieng",
+            yaxis2=dict(title="Tich luy", overlaying="y", side="right", range=[0, 1.05]),
+            **PLOTLY,
+        )
+        st.plotly_chart(fig_pca, use_container_width=True)
+
+        first_pipe = next(iter(bundle["pipelines"].values()))
+        pca_step = first_pipe.named_steps.get("pca")
+        if pca_step is not None:
+            loadings = pd.DataFrame(
+                pca_step.components_[: min(5, pca_step.n_components_)],
+                columns=bundle["feature_cols"],
+                index=[f"PC{i + 1}" for i in range(min(5, pca_step.n_components_))],
+            )
+            loadings.columns = [FEATURE_LABELS.get(c, c) for c in loadings.columns]
+            fig_load = px.imshow(
+                loadings, text_auto=".2f", aspect="auto",
+                title="He so tai (loadings) — 5 thanh phan dau",
+                color_continuous_scale="RdBu_r",
+            )
+            fig_load.update_layout(**PLOTLY, height=320)
+            st.plotly_chart(fig_load, use_container_width=True)
+
     df_m = pd.DataFrame(metrics).set_index("name")
     st.dataframe(df_m[["accuracy", "precision", "recall", "f1", "roc_auc"]], use_container_width=True)
 
@@ -170,13 +223,14 @@ elif page == "Mo hinh AI":
             fig_cm.update_layout(**PLOTLY, height=300)
             st.plotly_chart(fig_cm, use_container_width=True)
 
-    st.subheader("Feature importance (Top 10)")
+    st.subheader("Do quan trong thanh phan PCA (Top 10)")
     imp_rows = []
     for row in metrics:
         for feat, val in list(row["feature_importance"].items())[:10]:
-            imp_rows.append({"Mo hinh": row["name"], "Dac trung": FEATURE_LABELS.get(feat, feat), "Quan trong": val})
+            label = feat if feat.startswith("PC") else FEATURE_LABELS.get(feat, feat)
+            imp_rows.append({"Mo hinh": row["name"], "Thanh phan": label, "Quan trong": val})
     imp_df = pd.DataFrame(imp_rows)
-    fig_i = px.bar(imp_df, x="Quan trong", y="Dac trung", color="Mo hinh", orientation="h", height=500)
+    fig_i = px.bar(imp_df, x="Quan trong", y="Thanh phan", color="Mo hinh", orientation="h", height=500)
     fig_i.update_layout(**PLOTLY)
     st.plotly_chart(fig_i, use_container_width=True)
 

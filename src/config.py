@@ -14,6 +14,8 @@ TARGET_COL = "default payment next month"
 ID_COL = "ID"
 RANDOM_STATE = 42
 TEST_SIZE = 0.2
+# PCA: giu du thanh phan chinh giai thich >= ty le phuong sai nay (0.95 = 95%)
+PCA_VARIANCE = 0.95
 
 # Ten mo hinh hien thi tren dashboard
 MODEL_NAMES = [
